@@ -3,102 +3,602 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="dark">
 <title>VALE</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+    "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.min.js"
+  }
+}
+</script>
 <style>
-  :root{
-    --bg:#121212; --card:#1c1c1e; --text:#f2f2f2; --hint:#8e8e93; --accent:#ff8a2a;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    background:var(--bg); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    display:flex; flex-direction:column; min-height:100vh;
-    padding:calc(24px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));
-    -webkit-font-smoothing:antialiased;
-  }
-  main{flex:1; display:flex; flex-direction:column; gap:16px; max-width:480px; width:100%; margin:0 auto}
-  h1{font-size:44px; letter-spacing:.32em; font-weight:800; text-align:center; margin:12px 0 4px; padding-left:.32em}
-  h1 span{color:var(--accent)}
-  .bar{height:3px; width:64px; margin:0 auto 8px; background:var(--accent); border-radius:2px}
-  .hello{text-align:center; color:var(--hint); font-size:15px; min-height:20px}
-  .card{background:var(--card); border-radius:16px; padding:16px 18px; border:1px solid rgba(255,138,42,.12)}
-  .status{display:flex; align-items:center; justify-content:center; gap:10px; font-size:17px; font-weight:600}
-  .dot{width:12px; height:12px; border-radius:50%; background:var(--accent); position:relative}
-  .dot::after{content:""; position:absolute; inset:0; border-radius:50%; background:var(--accent); animation:pulse 1.6s ease-out infinite}
-  @keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.8);opacity:0}}
-  .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
-  .label{font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--hint); margin-bottom:6px}
-  .value{font-size:24px; font-weight:700; font-variant-numeric:tabular-nums}
-  .row{display:flex; justify-content:space-between; font-size:14px; padding:6px 0}
-  .row + .row{border-top:1px solid rgba(255,255,255,.06)}
-  .row span:first-child{color:var(--hint)}
-  footer{text-align:center; color:var(--hint); font-size:12px; margin-top:20px; letter-spacing:.04em}
+  :root{ --accent:#ff8a2a; --text:#f4efe9; --hint:#a39a91; --glass:rgba(18,14,12,.62); }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b0908;color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #top{position:fixed;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) 16px 0;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+  #top h1{font-size:18px;letter-spacing:.32em;font-weight:800}
+  #top h1 span{color:var(--accent)}
+  #state{font-size:12px;color:var(--hint);display:flex;align-items:center;gap:6px}
+  #state i{width:8px;height:8px;border-radius:50%;background:#5a524b;display:inline-block}
+  #state.on i{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  #loader{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0b0908;z-index:5;transition:opacity .5s}
+  #loader.done{opacity:0;pointer-events:none}
+  #loader .t{font-size:13px;color:var(--hint);letter-spacing:.08em}
+  #loader .track{width:min(260px,70vw);height:4px;border-radius:2px;background:#2a221d;overflow:hidden}
+  #loader .fill{height:100%;width:0;background:var(--accent);transition:width .15s}
+  #ui{position:fixed;left:0;right:0;bottom:0;padding:0 14px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none}
+  #ui > *{pointer-events:auto}
+  #log{width:100%;max-width:520px;display:flex;flex-direction:column;gap:6px;max-height:28vh;overflow:hidden;justify-content:flex-end}
+  .msg{align-self:flex-start;max-width:86%;padding:8px 12px;border-radius:14px;background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:14px;line-height:1.35}
+  .msg.me{align-self:flex-end;background:rgba(255,138,42,.22)}
+  .msg.interim{opacity:.6;font-style:italic}
+  #row{display:flex;align-items:center;gap:14px}
+  .btn{border:0;border-radius:999px;background:var(--glass);color:var(--text);font-size:14px;font-weight:600;padding:10px 16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .btn:active{transform:scale(.97)}
+  #mic{width:76px;height:76px;border-radius:50%;border:0;background:var(--accent);color:#1a0f06;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(255,138,42,.35)}
+  #mic svg{width:34px;height:34px}
+  #mic.listening{animation:ring 1.2s ease-out infinite;background:#ff5a2a}
+  #mic:disabled{opacity:.4}
+  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(255,90,42,.6)}100%{box-shadow:0 0 0 22px rgba(255,90,42,0)}}
+  #textrow{display:none;width:100%;max-width:520px;gap:8px}
+  #textrow.show{display:flex}
+  #text{flex:1;min-width:0;border:1px solid rgba(255,138,42,.25);border-radius:999px;background:var(--glass);color:var(--text);padding:11px 16px;font-size:16px;outline:none}
+  #credit{font-size:10px;color:#7d746c;text-align:center;line-height:1.3}
+  #credit a{color:inherit}
 </style>
 </head>
 <body>
-<main>
-  <h1>VAL<span>E</span></h1>
-  <div class="bar"></div>
-  <div class="hello" id="hello"></div>
-
-  <div class="card status"><span class="dot"></span><span>running</span></div>
-
-  <div class="grid">
-    <div class="card"><div class="label">Clock</div><div class="value" id="clock">--:--:--</div></div>
-    <div class="card"><div class="label">Open for</div><div class="value" id="uptime">0s</div></div>
+<canvas id="c"></canvas>
+<div id="top"><h1>VAL<span>E</span></h1><div id="state"><i></i><span id="stateText">idle</span></div></div>
+<div id="loader"><div class="t" id="loadText">Loading Vale… 0%</div><div class="track"><div class="fill" id="loadFill"></div></div></div>
+<div id="ui">
+  <div id="log"></div>
+  <div id="textrow"><input id="text" type="text" placeholder="Type to Vale…" autocomplete="off" enterkeyhint="send"><button class="btn" id="send">Send</button></div>
+  <div id="row">
+    <button class="btn" id="hi">Say hi</button>
+    <button id="mic" aria-label="Talk to Vale"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></button>
+    <button class="btn" id="kb">Type</button>
   </div>
+  <div id="credit">3D model: “VRM1_Constraint_Twist_Sample” © 2022 pixiv Inc. · <a href="https://vrm.dev/licenses/1.0/" target="_blank" rel="noopener">VRM Public License 1.0</a></div>
+</div>
 
-  <div class="card">
-    <div class="row"><span>Platform</span><span id="platform">—</span></div>
-    <div class="row"><span>Version</span><span id="version">—</span></div>
-  </div>
-</main>
-<footer>heyvale_bot · v0.1</footer>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-<script>
-(function(){
-  var tg = window.Telegram && window.Telegram.WebApp;
-  var root = document.documentElement.style;
+// Model is served from the pixiv/three-vrm repo via jsDelivr (pinned tag).
+const MODEL_URLS = [
+  'https://cdn.jsdelivr.net/gh/pixiv/three-vrm@v3.5.5/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm',
+  'https://raw.githubusercontent.com/pixiv/three-vrm/v3.5.5/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm'
+];
+const MODEL_BYTES = 10776032; // used for progress when no Content-Length
 
-  function applyTheme(){
-    if(!tg || !tg.themeParams) return;
-    var p = tg.themeParams;
-    if(p.bg_color) root.setProperty('--bg', p.bg_color);
-    if(p.secondary_bg_color) root.setProperty('--card', p.secondary_bg_color);
-    if(p.text_color) root.setProperty('--text', p.text_color);
-    if(p.hint_color) root.setProperty('--hint', p.hint_color);
+/* ---------------- Telegram ---------------- */
+const tg = window.Telegram && window.Telegram.WebApp;
+let userName = '';
+if (tg) {
+  try { tg.ready(); tg.expand(); } catch (e) {}
+  const atLeast = (v) => { try { return tg.isVersionAtLeast(v); } catch (e) { return false; } };
+  if (atLeast('6.1')) try { tg.setHeaderColor('#0b0908'); tg.setBackgroundColor('#0b0908'); } catch (e) {}
+  if (atLeast('7.7')) try { tg.disableVerticalSwipes(); } catch (e) {}
+  // Theme: the scene is always dark to match the bot art; use Telegram's text colour for UI hints if it's light.
+  const p = tg.themeParams || {};
+  if (p.hint_color && tg.colorScheme === 'dark') document.documentElement.style.setProperty('--hint', p.hint_color);
+  const u = tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (u && u.first_name) userName = u.first_name;
+}
+
+/* ---------------- Scene ---------------- */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.85;
+renderer.shadowMap.enabled = false;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0908);
+scene.fog = new THREE.Fog(0x0b0908, 3.5, 11);
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+const lookTarget = new THREE.Vector3(0, 1.22, 0);
+
+// lights: cool-ish soft key from front, warm orange rim from behind
+scene.add(new THREE.HemisphereLight(0x9aa0b0, 0x2a1a10, 0.4));
+const key = new THREE.DirectionalLight(0xfff6ee, 1.1); key.position.set(-0.8, 1.9, 2.4); scene.add(key);
+const rimL = new THREE.DirectionalLight(0xff7a1e, 2.2); rimL.position.set(-1.6, 2.0, -2.2); scene.add(rimL);
+const rimR = new THREE.DirectionalLight(0xff9a3c, 1.8); rimR.position.set(1.7, 1.6, -2.0); scene.add(rimR);
+const warmPt = new THREE.PointLight(0xff7a1e, 6, 6, 1.6); warmPt.position.set(0.6, 2.4, -2.4); scene.add(warmPt);
+
+// industrial set
+(function buildSet() {
+  const concrete = new THREE.MeshStandardMaterial({ color: 0x2a2623, roughness: 0.95, metalness: 0.05 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x1d1a18, roughness: 0.9 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.6, metalness: 0.6 });
+  const orange = new THREE.MeshStandardMaterial({ color: 0xd8641c, roughness: 0.5, metalness: 0.3 });
+  const glow = new THREE.MeshBasicMaterial({ color: 0xffa04a });
+
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), concrete);
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(30, 12), wallMat);
+  wall.position.set(0, 6, -5); scene.add(wall);
+
+  // pillars
+  for (const x of [-3.2, 3.2]) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.45, 8, 0.45), steel);
+    p.position.set(x, 4, -3.4); scene.add(p);
   }
-
-  if(tg){
-    try{ tg.ready(); tg.expand(); }catch(e){}
-    applyTheme();
-    try{ tg.onEvent('themeChanged', applyTheme); }catch(e){}
-    try{ tg.setHeaderColor && tg.setHeaderColor('bg_color'); }catch(e){}
-    var u = tg.initDataUnsafe && tg.initDataUnsafe.user;
-    if(u && u.first_name){ document.getElementById('hello').textContent = 'Hey, ' + u.first_name; }
-    document.getElementById('platform').textContent = tg.platform || 'unknown';
-    document.getElementById('version').textContent = tg.version || 'unknown';
-  } else {
-    document.getElementById('platform').textContent = 'browser';
-    document.getElementById('version').textContent = 'n/a';
+  // catwalk with orange railings behind her
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(12, 0.12, 1.2), steel);
+  deck.position.set(0, 2.2, -3.6); scene.add(deck);
+  const railGeo = new THREE.CylinderGeometry(0.03, 0.03, 12, 8); railGeo.rotateZ(Math.PI / 2);
+  for (const y of [2.75, 3.25]) { const r = new THREE.Mesh(railGeo, orange); r.position.set(0, y, -3.05); scene.add(r); }
+  const postGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.1, 8);
+  for (let x = -6; x <= 6; x += 0.9) { const p = new THREE.Mesh(postGeo, orange); p.position.set(x, 2.8, -3.05); scene.add(p); }
+  // ground-level railing, further back
+  for (const y of [0.55, 1.05]) { const r = new THREE.Mesh(railGeo, orange); r.position.set(0, y, -4.3); scene.add(r); }
+  for (let x = -6; x <= 6; x += 1.2) { const p = new THREE.Mesh(postGeo, orange); p.position.set(x, 0.55, -4.3); scene.add(p); }
+  // crates
+  const crate = new THREE.MeshStandardMaterial({ color: 0x3b3027, roughness: 0.9 });
+  [[-2.3, 0.4, -2.6, 0.8], [-1.6, 0.3, -3.1, 0.6], [2.4, 0.45, -2.8, 0.9]].forEach(([x, y, z, s]) => {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), crate); c.position.set(x, y, z); c.rotation.y = x * 0.4; scene.add(c);
+  });
+  // warm hanging lamps (emissive, no extra lights)
+  for (const x of [-2.2, 0.4, 2.8]) {
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.22, 0.14, 12), glow);
+    lamp.position.set(x, 4.2, -4.4); scene.add(lamp);
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 2, 4), steel);
+    cord.position.set(x, 5.25, -4.4); scene.add(cord);
   }
-
-  var start = Date.now();
-  function pad(n){ return (n<10?'0':'') + n; }
-  function fmt(s){
-    var h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
-    return h ? h+'h '+pad(m)+'m '+pad(sec)+'s' : m ? m+'m '+pad(sec)+'s' : sec+'s';
-  }
-  function tick(){
-    var d = new Date();
-    document.getElementById('clock').textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
-    document.getElementById('uptime').textContent = fmt(Math.floor((Date.now()-start)/1000));
-  }
-  tick(); setInterval(tick, 1000);
+  // a warm light strip on the back wall
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(6, 0.05, 0.05), glow);
+  strip.position.set(-1, 3.9, -4.95); scene.add(strip);
 })();
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  // keep roughly waist-up framing: in portrait, pull back so shoulders fit
+  const aspect = w / h;
+  const dist = aspect < 0.8 ? 1.75 + (0.8 - aspect) * 1.3 : 1.6;
+  camera.position.set(0, 1.36, dist);
+  // shift aim up a bit in portrait so the face sits above the UI
+  lookTarget.y = aspect < 0.8 ? 1.12 : 1.2;
+  camera.lookAt(lookTarget);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+if (tg) try { tg.onEvent('viewportChanged', resize); } catch (e) {}
+resize();
+
+/* ---------------- Load VRM ---------------- */
+let vrm = null;
+const loader = new GLTFLoader();
+loader.register((parser) => new VRMLoaderPlugin(parser));
+const loadFill = document.getElementById('loadFill');
+const loadText = document.getElementById('loadText');
+
+function loadModel(i = 0) {
+  loader.load(MODEL_URLS[i], (gltf) => {
+    vrm = gltf.userData.vrm;
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    if (VRMUtils.combineSkeletons) VRMUtils.combineSkeletons(gltf.scene);
+    VRMUtils.rotateVRM0(vrm);
+    vrm.scene.traverse((o) => { o.frustumCulled = false; });
+    styleModel(vrm);
+    scene.add(vrm.scene);
+    restPose();
+    if (vrm.lookAt) vrm.lookAt.target = eyeTarget;
+    loadFill.style.width = '100%';
+    loadText.textContent = 'Ready';
+    setTimeout(() => document.getElementById('loader').classList.add('done'), 250);
+    window.__valeLoaded = true;
+  }, (ev) => {
+    const total = ev.total || MODEL_BYTES;
+    const pct = Math.min(99, Math.round(ev.loaded / total * 100));
+    loadFill.style.width = pct + '%';
+    loadText.textContent = 'Loading Vale… ' + pct + '%';
+  }, (err) => {
+    if (i + 1 < MODEL_URLS.length) return loadModel(i + 1);
+    loadText.textContent = 'Could not load Vale’s model. Check your connection and reopen.';
+    console.warn('VRM load failed', err);
+  });
+}
+loadModel();
+
+const grayCache = new Map();
+function grayTexture(tex) {
+  if (grayCache.has(tex)) return grayCache.get(tex);
+  const img = tex.image;
+  if (!img || !img.width) return tex;
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height), a = d.data;
+  for (let i = 0; i < a.length; i += 4) {
+    const y = Math.min(255, (0.3 * a[i] + 0.59 * a[i + 1] + 0.11 * a[i + 2]) * 1.35 + 30);
+    a[i] = a[i + 1] = a[i + 2] = y;
+  }
+  g.putImageData(d, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = tex.colorSpace; t.flipY = tex.flipY; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
+  t.magFilter = tex.magFilter; t.minFilter = tex.minFilter; t.channel = tex.channel;
+  grayCache.set(tex, t);
+  return t;
+}
+// Nudge the sample's look toward Vale: blonde hair, dark top.
+function styleModel(v) {
+  v.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (!m || !m.name) continue;
+      if (/HAIR/i.test(m.name)) {
+        // the sample's hair texture is red: desaturate it, then tint dirty-blonde
+        if (m.map) m.map = grayTexture(m.map);
+        if (m.shadeMultiplyTexture) m.shadeMultiplyTexture = grayTexture(m.shadeMultiplyTexture);
+        if (m.color) m.color.set(0xfff0c8);
+        if (m.shadeColorFactor) m.shadeColorFactor.set(0xb8965e);
+      } else if (/Tops/i.test(m.name)) {
+        if (m.color) m.color.set(0x34302e);
+        if (m.shadeColorFactor) m.shadeColorFactor.set(0x151312);
+      }
+    }
+  });
+}
+
+/* ---------------- Pose / idle animation ---------------- */
+const bone = (n) => vrm && vrm.humanoid ? vrm.humanoid.getNormalizedBoneNode(n) : null;
+function restPose() {
+  const s = (n, x, y, z) => { const b = bone(n); if (b) b.rotation.set(x, y, z); };
+  s('leftUpperArm', 0, 0, -1.22);
+  s('rightUpperArm', 0, 0, 1.22);
+  s('leftLowerArm', 0, -0.25, -0.12);
+  s('rightLowerArm', 0, 0.25, 0.12);
+  s('leftHand', 0, 0, -0.1);
+  s('rightHand', 0, 0, 0.1);
+}
+
+const eyeTarget = new THREE.Object3D();
+scene.add(eyeTarget);
+const pointer = new THREE.Vector2(0, 0), pointerSmooth = new THREE.Vector2(0, 0);
+function onPoint(x, y) {
+  pointer.set((x / window.innerWidth) * 2 - 1, -((y / window.innerHeight) * 2 - 1));
+}
+window.addEventListener('pointermove', (e) => onPoint(e.clientX, e.clientY), { passive: true });
+window.addEventListener('pointerdown', (e) => onPoint(e.clientX, e.clientY), { passive: true });
+window.addEventListener('touchmove', (e) => { const t = e.touches[0]; if (t) onPoint(t.clientX, t.clientY); }, { passive: true });
+
+// blinking: every 2-6 s
+let nextBlink = 1.5, blinkT = -1;
+function updateBlink(t, dt) {
+  if (blinkT < 0 && t > nextBlink) blinkT = 0;
+  let v = 0;
+  if (blinkT >= 0) {
+    blinkT += dt;
+    const d = 0.16;
+    v = blinkT < d / 2 ? blinkT / (d / 2) : Math.max(0, 1 - (blinkT - d / 2) / (d / 2));
+    if (blinkT >= d) { blinkT = -1; nextBlink = t + 2 + Math.random() * 4; }
+  }
+  vrm.expressionManager && vrm.expressionManager.setValue('blink', v);
+}
+
+/* ---------------- Lip-sync ---------------- */
+const VOWELS = ['aa', 'ih', 'ou', 'ee', 'oh'];
+const mouthTarget = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+const mouth = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+const speech = { mode: 'none', wordStart: 0, word: '', wordDur: 0.3 }; // mode: none | tts | sim | audio
+let audioCtx = null, analyser = null, freqData = null, timeData = null;
+
+function setSpeaking(on) {
+  document.getElementById('state').classList.toggle('on', on);
+  document.getElementById('stateText').textContent = on ? 'speaking' : (listening ? 'listening' : 'idle');
+}
+
+// Map a letter to a vowel shape (rough).
+function letterVowel(ch) {
+  switch (ch) {
+    case 'a': return 'aa';
+    case 'e': return 'ee';
+    case 'i': case 'y': return 'ih';
+    case 'o': return 'oh';
+    case 'u': case 'w': return 'ou';
+    default: return null;
+  }
+}
+function wordVowels(w) {
+  const v = [];
+  for (const ch of (w || '').toLowerCase()) { const x = letterVowel(ch); if (x && v[v.length - 1] !== x) v.push(x); }
+  return v.length ? v : ['aa'];
+}
+
+// procedural mouth for speechSynthesis (cannot be analysed): driven by word boundaries
+function proceduralMouth(t) {
+  for (const k of VOWELS) mouthTarget[k] = 0;
+  const vs = wordVowels(speech.word);
+  const local = Math.max(0, t - speech.wordStart);
+  const prog = Math.min(0.999, local / speech.wordDur);
+  const syl = vs[Math.floor(prog * vs.length)];
+  // syllable open/close at ~6-7 Hz with a little noise; quieter in gaps between words
+  const osc = 0.5 + 0.5 * Math.sin(local * Math.PI * 2 * 6.5 - Math.PI / 2);
+  const gap = local > speech.wordDur * 1.25 ? 0.25 : 1;
+  const amp = (0.35 + 0.55 * osc) * gap * (0.85 + 0.15 * Math.sin(t * 23.0));
+  mouthTarget[syl] = amp;
+  if (syl !== 'aa') mouthTarget.aa = amp * 0.25;
+}
+
+// real audio: amplitude + rough band-energy vowel guess
+function analyserMouth() {
+  for (const k of VOWELS) mouthTarget[k] = 0;
+  analyser.getByteTimeDomainData(timeData);
+  let sum = 0;
+  for (let i = 0; i < timeData.length; i++) { const x = (timeData[i] - 128) / 128; sum += x * x; }
+  const rms = Math.sqrt(sum / timeData.length);
+  const level = Math.min(1, Math.max(0, (rms - 0.015) * 6));
+  if (level <= 0) return;
+  analyser.getByteFrequencyData(freqData);
+  const hz = audioCtx.sampleRate / 2 / freqData.length;
+  const band = (a, b) => { let s = 0, n = 0; for (let i = Math.floor(a / hz); i <= Math.ceil(b / hz) && i < freqData.length; i++) { s += freqData[i]; n++; } return n ? s / n / 255 : 0; };
+  const low = band(200, 600), mid = band(600, 1400), high = band(1400, 3500);
+  const tot = low + mid + high + 1e-6;
+  const l = low / tot, m = mid / tot, h = high / tot;
+  if (h > 0.42) { mouthTarget.ee = level * h * 1.6; mouthTarget.ih = level * 0.5; }
+  else if (l > 0.5) { if (m > 0.3) mouthTarget.oh = level; else mouthTarget.ou = level; }
+  else { mouthTarget.aa = level * (0.6 + m); mouthTarget.ih = level * h * 0.6; }
+  for (const k of VOWELS) mouthTarget[k] = Math.min(1, mouthTarget[k]);
+}
+
+function updateMouth(t, dt) {
+  if (speech.mode === 'tts' || speech.mode === 'sim') proceduralMouth(t);
+  else if (speech.mode === 'audio' && analyser) analyserMouth();
+  else for (const k of VOWELS) mouthTarget[k] = 0; // mouth only moves while speaking
+  const rate = 1 - Math.exp(-dt * 22);
+  for (const k of VOWELS) {
+    mouth[k] += (mouthTarget[k] - mouth[k]) * rate;
+    if (speech.mode === 'none' && mouth[k] < 0.01) mouth[k] = 0;
+    vrm.expressionManager && vrm.expressionManager.setValue(k, mouth[k]);
+  }
+}
+window.__valeMouth = () => ({ ...mouth });
+
+/* ---- speaking: browser TTS ---- */
+let voice = null;
+function pickVoice() {
+  const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || [];
+  const en = vs.filter((v) => /^en/i.test(v.lang));
+  const prefs = [/samantha/i, /google uk english female/i, /google us english/i, /aria|jenny|zira|female/i, /karen|moira|tessa|victoria|serena|fiona|ava|allison|susan/i];
+  for (const re of prefs) { const v = en.find((x) => re.test(x.name)); if (v) return v; }
+  return en[0] || vs[0] || null;
+}
+if (window.speechSynthesis) {
+  voice = pickVoice();
+  speechSynthesis.onvoiceschanged = () => { voice = pickVoice(); };
+}
+
+let simTimer = null, speakToken = 0;
+function speak(text) {
+  const token = ++speakToken;
+  addMsg(text, 'vale');
+  stopSpeaking(false);
+  const words = text.split(/\s+/).filter(Boolean);
+  const now = () => clock.elapsedTime;
+  const startSim = () => {
+    // fallback when no TTS voice is available (or TTS never starts): animate on a timed word schedule
+    if (token !== speakToken || speech.mode !== 'none') return;
+    speech.mode = 'sim'; setSpeaking(true);
+    let i = 0;
+    const next = () => {
+      if (token !== speakToken) return;
+      if (i >= words.length) { endSpeak(token); return; }
+      const w = words[i++];
+      speech.word = w; speech.wordStart = now(); speech.wordDur = Math.max(0.18, 0.07 * w.length + 0.12);
+      simTimer = setTimeout(next, speech.wordDur * 1000 + (/[,.!?]$/.test(w) ? 220 : 40));
+    };
+    next();
+  };
+  if (!window.speechSynthesis || !voice) { startSim(); return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.voice = voice; u.lang = voice.lang || 'en-US'; u.rate = 1.0; u.pitch = 1.1;
+  let gotBoundary = false;
+  u.onstart = () => {
+    if (token !== speakToken) return;
+    clearTimeout(simTimer);
+    speech.mode = 'tts'; setSpeaking(true);
+    speech.word = words[0] || ''; speech.wordStart = now(); speech.wordDur = 0.3;
+    // if this engine never fires boundary events, step through words on a timer
+    setTimeout(function step(i = 1) {
+      if (token !== speakToken || gotBoundary || speech.mode !== 'tts' || i >= words.length) return;
+      speech.word = words[i]; speech.wordStart = now(); speech.wordDur = Math.max(0.18, 0.07 * words[i].length + 0.12);
+      setTimeout(() => step(i + 1), speech.wordDur * 1000 + 40);
+    }, 380);
+  };
+  u.onboundary = (e) => {
+    if (token !== speakToken || (e.name && e.name !== 'word')) return;
+    gotBoundary = true;
+    const rest = text.slice(e.charIndex);
+    const w = (rest.match(/^\S+/) || [''])[0];
+    speech.word = w; speech.wordStart = now();
+    speech.wordDur = Math.max(0.18, (e.charLength || w.length) * 0.065 + 0.1);
+  };
+  u.onend = u.onerror = () => endSpeak(token);
+  speechSynthesis.speak(u);
+  // if TTS hasn't started in 1.2 s (blocked autoplay, no engine), fall back to the simulated mouth
+  simTimer = setTimeout(() => { if (token === speakToken && speech.mode === 'none') { try { speechSynthesis.cancel(); } catch (e) {} startSim(); } }, 1200);
+}
+function endSpeak(token) {
+  if (token !== speakToken) return;
+  clearTimeout(simTimer);
+  speech.mode = 'none'; speech.word = '';
+  setSpeaking(false);
+}
+function stopSpeaking(clearTts = true) {
+  clearTimeout(simTimer);
+  if (clearTts && window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) {}
+  else if (window.speechSynthesis && speechSynthesis.speaking) try { speechSynthesis.cancel(); } catch (e) {}
+  speech.mode = 'none'; setSpeaking(false);
+}
+
+/* ---- speaking: real audio (for a future backend that returns TTS audio) ---- */
+async function playAudio(src) {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!analyser) {
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.5;
+    freqData = new Uint8Array(analyser.frequencyBinCount); timeData = new Uint8Array(analyser.fftSize);
+    analyser.connect(audioCtx.destination);
+  }
+  let buf = src;
+  if (!(src instanceof AudioBuffer)) {
+    const ab = src instanceof ArrayBuffer ? src : await (await fetch(src)).arrayBuffer();
+    buf = await audioCtx.decodeAudioData(ab);
+  }
+  stopSpeaking();
+  const token = ++speakToken;
+  const node = audioCtx.createBufferSource();
+  node.buffer = buf; node.connect(analyser);
+  speech.mode = 'audio'; setSpeaking(true);
+  node.onended = () => endSpeak(token);
+  node.start();
+  return node;
+}
+
+/* ---------------- Brain ---------------- */
+// TODO: replace with a real backend (e.g. POST the text to a server that talks to Vale
+// and returns { text, audioUrl }). Keep secrets on the server, never in this page.
+// If the backend returns audio, call playAudio(audioUrl) for analyser-driven lip-sync.
+async function getReply(text) {
+  const t = text.toLowerCase().trim();
+  const name = userName || 'Nick';
+  if (!t) return "I didn't catch that.";
+  if (/^(hi|hey|hello|yo|sup|good (morning|afternoon|evening))\b/.test(t)) return `Hey ${name}. I'm right here. What do you need?`;
+  if (/\b(time|clock)\b/.test(t)) return `It's ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`;
+  if (/\b(date|today|day is it)\b/.test(t)) return `Today is ${new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}.`;
+  if (/who are you|what are you|your name/.test(t)) return "I'm Vale. Your partner. For now I live in this little app, and my brain here is just a placeholder.";
+  if (/how are you/.test(t)) return "Running smooth. Thanks for asking.";
+  if (/thank/.test(t)) return "Anytime.";
+  if (/\b(bye|goodnight|good night|later)\b/.test(t)) return `Later, ${name}.`;
+  return `You said: ${text}. My real brain isn't hooked up in here yet, but I heard you.`;
+}
+
+async function handleUserText(text) {
+  if (!text || !text.trim()) return;
+  addMsg(text, 'me');
+  const reply = await getReply(text);
+  speak(reply);
+}
+
+/* ---------------- UI ---------------- */
+const log = document.getElementById('log');
+function addMsg(text, who, interim = false) {
+  let el = interim ? log.querySelector('.interim') : null;
+  if (!el) { el = document.createElement('div'); log.appendChild(el); }
+  el.className = 'msg' + (who === 'me' ? ' me' : '') + (interim ? ' interim' : '');
+  el.textContent = text;
+  while (log.children.length > 6) log.removeChild(log.firstChild);
+  return el;
+}
+function clearInterim() { const el = log.querySelector('.interim'); if (el) el.remove(); }
+
+let ttsUnlocked = false;
+function unlockTTS() {
+  // iOS needs speechSynthesis to be started inside a user gesture once
+  if (ttsUnlocked || !window.speechSynthesis) return;
+  ttsUnlocked = true;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
+}
+
+document.getElementById('hi').addEventListener('click', () => {
+  unlockTTS();
+  speak(`Hey ${userName || 'Nick'}! It's me, Vale. I'm standing right here. Tap the mic and talk to me.`);
+});
+
+const textrow = document.getElementById('textrow'), textIn = document.getElementById('text');
+function showText(focus) { textrow.classList.add('show'); if (focus) textIn.focus(); }
+document.getElementById('kb').addEventListener('click', () => { unlockTTS(); textrow.classList.contains('show') ? textrow.classList.remove('show') : showText(true); });
+function sendText() { unlockTTS(); const v = textIn.value; textIn.value = ''; handleUserText(v); }
+document.getElementById('send').addEventListener('click', sendText);
+textIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendText(); } });
+
+// Voice chat: SpeechRecognition where available, else the text box
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micBtn = document.getElementById('mic');
+let rec = null, listening = false;
+if (!SR) showText(false);
+micBtn.addEventListener('click', () => {
+  unlockTTS();
+  if (!SR) { addMsg("Voice input isn't supported in this app view, so type to me below.", 'vale'); showText(true); return; }
+  if (listening) { try { rec.stop(); } catch (e) {} return; }
+  stopSpeaking();
+  rec = new SR();
+  rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  let finalText = '';
+  rec.onstart = () => { listening = true; micBtn.classList.add('listening'); setSpeaking(false); };
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
+    }
+    if (interim) addMsg(interim, 'me', true);
+  };
+  rec.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture') {
+      addMsg("I can't use the mic here. Type to me instead.", 'vale'); showText(true);
+    }
+  };
+  rec.onend = () => {
+    listening = false; micBtn.classList.remove('listening'); clearInterim(); setSpeaking(false);
+    if (finalText.trim()) handleUserText(finalText.trim());
+  };
+  try { rec.start(); } catch (e) { showText(true); }
+});
+
+window.vale = { speak, playAudio, getReply };
+
+/* ---------------- Loop ---------------- */
+const clock = new THREE.Clock();
+function tick() {
+  requestAnimationFrame(tick);
+  if (document.hidden) return;
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const t = clock.elapsedTime;
+  if (vrm) {
+    pointerSmooth.lerp(pointer, 1 - Math.exp(-dt * 4));
+    // eyes follow pointer/touch; head follows lightly
+    eyeTarget.position.set(pointerSmooth.x * 0.8, 1.35 + pointerSmooth.y * 0.45, 1.6);
+    const breath = Math.sin(t * 1.6);
+    const sway = Math.sin(t * 0.55);
+    const s = (n, f) => { const b = bone(n); if (b) f(b); };
+    s('hips', (b) => { b.rotation.z = sway * 0.02; b.rotation.y = Math.sin(t * 0.37) * 0.03; });
+    s('spine', (b) => { b.rotation.x = breath * 0.012; b.rotation.z = -sway * 0.015; });
+    s('chest', (b) => { b.rotation.x = breath * 0.018; });
+    s('upperChest', (b) => { b.rotation.x = breath * 0.012; });
+    s('neck', (b) => { b.rotation.y = pointerSmooth.x * 0.12; b.rotation.x = -pointerSmooth.y * 0.06; });
+    s('head', (b) => {
+      const talk = speech.mode !== 'none' ? Math.sin(t * 3.1) * 0.025 : 0;
+      b.rotation.y = pointerSmooth.x * 0.18 + Math.sin(t * 0.5) * 0.02;
+      b.rotation.x = -pointerSmooth.y * 0.1 + talk;
+      b.rotation.z = Math.sin(t * 0.43) * 0.02;
+    });
+    s('leftUpperArm', (b) => { b.rotation.z = -1.22 + breath * 0.012; });
+    s('rightUpperArm', (b) => { b.rotation.z = 1.22 - breath * 0.012; });
+    s('leftShoulder', (b) => { b.rotation.z = breath * 0.01; });
+    s('rightShoulder', (b) => { b.rotation.z = -breath * 0.01; });
+    updateBlink(t, dt);
+    updateMouth(t, dt);
+    vrm.update(dt);
+  }
+  renderer.render(scene, camera);
+}
+tick();
 </script>
 </body>
 </html>
