@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark light">
+<title>VALE</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#121212; --card:#1c1c1e; --text:#f2f2f2; --hint:#8e8e93; --accent:#ff8a2a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; min-height:100vh;
+    padding:calc(24px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased;
+  }
+  main{flex:1; display:flex; flex-direction:column; gap:16px; max-width:480px; width:100%; margin:0 auto}
+  h1{font-size:44px; letter-spacing:.32em; font-weight:800; text-align:center; margin:12px 0 4px; padding-left:.32em}
+  h1 span{color:var(--accent)}
+  .bar{height:3px; width:64px; margin:0 auto 8px; background:var(--accent); border-radius:2px}
+  .hello{text-align:center; color:var(--hint); font-size:15px; min-height:20px}
+  .card{background:var(--card); border-radius:16px; padding:16px 18px; border:1px solid rgba(255,138,42,.12)}
+  .status{display:flex; align-items:center; justify-content:center; gap:10px; font-size:17px; font-weight:600}
+  .dot{width:12px; height:12px; border-radius:50%; background:var(--accent); position:relative}
+  .dot::after{content:""; position:absolute; inset:0; border-radius:50%; background:var(--accent); animation:pulse 1.6s ease-out infinite}
+  @keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.8);opacity:0}}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .label{font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--hint); margin-bottom:6px}
+  .value{font-size:24px; font-weight:700; font-variant-numeric:tabular-nums}
+  .row{display:flex; justify-content:space-between; font-size:14px; padding:6px 0}
+  .row + .row{border-top:1px solid rgba(255,255,255,.06)}
+  .row span:first-child{color:var(--hint)}
+  footer{text-align:center; color:var(--hint); font-size:12px; margin-top:20px; letter-spacing:.04em}
+</style>
+</head>
+<body>
+<main>
+  <h1>VAL<span>E</span></h1>
+  <div class="bar"></div>
+  <div class="hello" id="hello"></div>
+
+  <div class="card status"><span class="dot"></span><span>running</span></div>
+
+  <div class="grid">
+    <div class="card"><div class="label">Clock</div><div class="value" id="clock">--:--:--</div></div>
+    <div class="card"><div class="label">Open for</div><div class="value" id="uptime">0s</div></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><span>Platform</span><span id="platform">—</span></div>
+    <div class="row"><span>Version</span><span id="version">—</span></div>
+  </div>
+</main>
+<footer>heyvale_bot · v0.1</footer>
+
+<script>
+(function(){
+  var tg = window.Telegram && window.Telegram.WebApp;
+  var root = document.documentElement.style;
+
+  function applyTheme(){
+    if(!tg || !tg.themeParams) return;
+    var p = tg.themeParams;
+    if(p.bg_color) root.setProperty('--bg', p.bg_color);
+    if(p.secondary_bg_color) root.setProperty('--card', p.secondary_bg_color);
+    if(p.text_color) root.setProperty('--text', p.text_color);
+    if(p.hint_color) root.setProperty('--hint', p.hint_color);
+  }
+
+  if(tg){
+    try{ tg.ready(); tg.expand(); }catch(e){}
+    applyTheme();
+    try{ tg.onEvent('themeChanged', applyTheme); }catch(e){}
+    try{ tg.setHeaderColor && tg.setHeaderColor('bg_color'); }catch(e){}
+    var u = tg.initDataUnsafe && tg.initDataUnsafe.user;
+    if(u && u.first_name){ document.getElementById('hello').textContent = 'Hey, ' + u.first_name; }
+    document.getElementById('platform').textContent = tg.platform || 'unknown';
+    document.getElementById('version').textContent = tg.version || 'unknown';
+  } else {
+    document.getElementById('platform').textContent = 'browser';
+    document.getElementById('version').textContent = 'n/a';
+  }
+
+  var start = Date.now();
+  function pad(n){ return (n<10?'0':'') + n; }
+  function fmt(s){
+    var h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
+    return h ? h+'h '+pad(m)+'m '+pad(sec)+'s' : m ? m+'m '+pad(sec)+'s' : sec+'s';
+  }
+  function tick(){
+    var d = new Date();
+    document.getElementById('clock').textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+    document.getElementById('uptime').textContent = fmt(Math.floor((Date.now()-start)/1000));
+  }
+  tick(); setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
